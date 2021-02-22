@@ -1,0 +1,23 @@
+version: '2.2'
+
+services:
+  jenkins:
+    image: jenkins/jenkins:2.280
+    container_name: jenkins
+    environment:
+      - JENKINS_ADMIN_ID=admin
+      - JENKINS_ADMIN_PASSWORD=admin
+    ports:
+      - '80:80'
+    volumes:
+      - 'volume1:/tmp/dir1'
+  nexus:
+    image: sonatype/nexus3:3.29.2
+    ports:
+      - '8081:8081'
+    restart: always
+    volumes:
+      - 'nexus-data:/nexus-data'
+volumes:
+  nexus-data:
+  volume1:
