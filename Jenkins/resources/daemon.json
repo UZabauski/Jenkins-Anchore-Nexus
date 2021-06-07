@@ -1,0 +1,3 @@
+{
+    "insecure-registries" : ["my-nexus:8082"]
+}

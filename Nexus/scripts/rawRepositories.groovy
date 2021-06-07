@@ -1,0 +1,7 @@
+// Сreate a new blob store dedicated to usage with raw repositories
+def rawStore = blobStore.createFileBlobStore('raw', 'raw')
+
+// Сreate a first raw hosted repository for documentation using the new blob store
+repository.createRawHosted('my-documentation', rawStore.name)
+
+log.info('Script rawRepositories completed successfully')

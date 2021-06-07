@@ -17,6 +17,80 @@ security:
     authenticators:
     - global:
         strategy: triggeringUsersAuthorizationStrategy
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+        - usernamePassword:
+            scope: GLOBAL
+            id: "nexus"
+            username: "admin"
+            password: "admin"
+            description: "Nexus credentials for connecting to Nexus docker registry"
 unclassified:
   location:
     url: http://127.0.0.1:8080/
+  globalNexusConfiguration:
+    nxrmConfigs:
+    - nxrm3Configuration:
+        displayName: "nexus"
+        id: "234325"
+        internalId: "nexus"
+        serverUrl: "http://127.0.0.1:8228/"
+jobs:
+  - script: >
+      folder('Docker')
+  - script: >
+      pipelineJob('Docker/Anchore-analyze') {
+        parameters {
+          choiceParam('DOCKER_IMAGE', ['flask', 'httpd', 'webGoat'], 'Choose which Docker image will be built and scanned.')
+        }
+        properties {
+          githubProjectUrl('https://github.com/UZabauski/Dockerfiles-templates.git')
+        }
+        definition {
+          cps {
+            script("""\
+              pipeline {
+                agent any
+                environment {
+                  registryCredentials = 'nexus'
+                  registry = 'http://localhost:8082/'
+                  dockerImage = ''
+                }
+                stages {
+                  stage ('Downloading Docker images') {
+                    steps {
+                      git 'https://github.com/UZabauski/Dockerfiles-templates.git'
+                    }
+                  }
+                  stage ('Building the required Docker image') {
+                    steps {
+                      script {
+                        dir("IncorrectDockerfiles/${env.DOCKER_IMAGE}/") {
+                          dockerImage = docker.build("${env.DOCKER_IMAGE}:v${env.BUILD_ID}")
+                        }
+                      }
+                    }
+                  }
+                  stage ('Pushing Docker image to the Nexus') {
+                    steps {
+                      script {
+                        docker.withRegistry( registry, registryCredentials ) {
+                          dockerImage.push()
+                        }
+                      }
+                    }
+                  }
+                  stage ('Analyzing Docker image with Anchore') {
+                    steps {
+                      writeFile file: 'anchore_images', text: "http://localhost:8081/repository/docker-private/${env.DOCKER_IMAGE}:v${env.BUILD_ID}"
+                      anchore name: 'anchore_images'
+                    }
+                  }
+                }
+              }""".stripIndent())
+            sandbox(true)
+          }
+        }
+      }

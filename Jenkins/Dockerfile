@@ -1,4 +1,4 @@
-FROM jenkins/jenkins:2.280
+FROM jenkins/jenkins:2.296-jdk11
 LABEL maintainer="uzabauski@gmail.com"
 
 # Install docker in docker
@@ -6,6 +6,10 @@ ARG HOST_UID=1004
 ARG HOST_GID=999
 
 USER root
+
+#RUN mkdir -p /etc/docker
+#COPY resources/daemon.json /etc/docker/
+
 RUN apt-get -y update && \
     apt-get -y install apt-transport-https ca-certificates curl gnupg-agent software-properties-common && \
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
@@ -18,8 +22,6 @@ RUN groupmod -g $HOST_GID docker
 RUN usermod -aG docker jenkins
 
 VOLUME /var/lib/docker
-
-#USER jenkins
 
 # https://github.com/jenkinsci/docker/blob/master/README.md
 ENV TRY_UPGRADE_IF_NO_MARKER=false

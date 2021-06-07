@@ -1,23 +1,42 @@
-import jenkins.model.Jenkins
+import jenkins.*
+import jenkins.model.*
+import hudson.model.*
+import java.util.logging.Logger
 import org.jenkinsci.plugins.*
 import hudson.plugins.locale.PluginImpl
 
 def instance = Jenkins.instance
-def jenkinsCliDescriptor = instance.getDescriptor("jenkins.CLI").get()
+Logger logger = Logger.getLogger("00-global-settings.groovy")
 
 // Configure EN locale
-println("[INFO] Configuring locale")
+logger.info("Configuring locale")
 PluginImpl localePlugin = (PluginImpl)instance.getPlugin("locale")
 localePlugin.systemLocale = "en_US"
 localePlugin.@ignoreAcceptLanguage=true
 
-// Disable Jenkins CLI
-if (jenkinsCliDescriptor.isEnabled()) {
-    jenkinsCliDescriptor.setEnabled(false)
-    println('[INFO] Jenkins CLI has been disabled.')
-} else {
-    println('[INFO] Nothing changed. Jenkins CLI already disabled.')
+// Disable CLI access over TCP listener (separate port)
+logger.info("Disabling the Jenkins CLI...")
+def p = AgentProtocol.all()
+p.each { x ->
+    if (x.name?.contains("CLI")) {
+        logger.info("Removing protocol ${x.name}")
+        p.remove(x)
+    }
 }
+
+// Disable CLI access over /cli URL
+def removal = { lst ->
+    lst.each { x ->
+        if (x.getClass().name.contains("CLIAction")) {
+            logger.info("Removing extension ${x.getClass().name}")
+            lst.remove(x)
+        }
+    }
+}
+def j = Jenkins.instance
+removal(j.getExtensionList(RootAction.class))
+removal(j.actions)
+logger.info("CLI disabled")
 
 // println("--- Configuring git global options")
 // def desc = instance.getDescriptor("hudson.plugins.git.GitSCM")

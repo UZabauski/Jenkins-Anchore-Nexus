@@ -1,23 +1,170 @@
-version: '2.2'
+version: '2.1'
+
+volumes:
+  anchore-db-volume:
+    # Set this to 'true' to use an external volume. In which case, it must be created manually with "docker volume create anchore-db-volume"
+    external: false
 
 services:
   jenkins:
-    image: jenkins/jenkins:2.280
+    build: Jenkins
+#    image: jenkins/jenkins:2.281
     container_name: jenkins
     environment:
       - JENKINS_ADMIN_ID=admin
       - JENKINS_ADMIN_PASSWORD=admin
     ports:
-      - '80:80'
+      - '8080:8080'
     volumes:
-      - 'volume1:/tmp/dir1'
+#      - 'volume1:/tmp/dir1'
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    networks:
+      my_net:
+        ipv4_address: 172.16.238.2
+
   nexus:
-    image: sonatype/nexus3:3.29.2
+    #build: Nexus
+    image: sonatype/nexus3:3.30.1
+    container_name: nexus
     ports:
       - '8081:8081'
+      - '8082:8082'
     restart: always
+    networks:
+        my_net:
+          ipv4_address: 172.16.238.3
+
+  # The primary API endpoint service
+  api:
+    image: anchore/anchore-engine:v0.9.4
+    depends_on:
+      - db
+      - catalog
+    ports:
+      - "8228:8228"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 100m
+    environment:
+      - ANCHORE_ENDPOINT_HOSTNAME=api
+      - ANCHORE_ADMIN_PASSWORD=foobar
+      - ANCHORE_DB_HOST=db
+      - ANCHORE_DB_PASSWORD=mysecretpassword
+    command: ["anchore-manager", "service", "start", "apiext"]
+    networks:
+      my_net:
+        ipv4_address: 172.16.238.4
+
+  # Catalog is the primary persistence and state manager of the system
+  catalog:
+    image: anchore/anchore-engine:v0.9.4
+    depends_on:
+      - db
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 100m
+    expose:
+      - 8228
+    environment:
+      - ANCHORE_ENDPOINT_HOSTNAME=catalog
+      - ANCHORE_ADMIN_PASSWORD=foobar
+      - ANCHORE_DB_HOST=db
+      - ANCHORE_DB_PASSWORD=mysecretpassword
+    command: ["anchore-manager", "service", "start", "catalog"]
+    networks:
+      my_net:
+        ipv4_address: 172.16.238.5
+  
+  queue:
+    image: anchore/anchore-engine:v0.9.4
+    depends_on:
+      - db
+      - catalog
+    expose:
+      - 8228
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 100m
+    environment:
+      - ANCHORE_ENDPOINT_HOSTNAME=queue
+      - ANCHORE_ADMIN_PASSWORD=foobar
+      - ANCHORE_DB_HOST=db
+      - ANCHORE_DB_PASSWORD=mysecretpassword
+    command: ["anchore-manager", "service", "start", "simplequeue"]
+    networks:
+      my_net:
+        ipv4_address: 172.16.238.6
+
+  policy-engine:
+    image: anchore/anchore-engine:v0.9.4
+    depends_on:
+      - db
+      - catalog
+    expose:
+      - 8228
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 100m
+    environment:
+      - ANCHORE_ENDPOINT_HOSTNAME=policy-engine
+      - ANCHORE_ADMIN_PASSWORD=foobar
+      - ANCHORE_DB_HOST=db
+      - ANCHORE_DB_PASSWORD=mysecretpassword
+    command: ["anchore-manager", "service", "start", "policy_engine"]
+    networks:
+      my_net:
+        ipv4_address: 172.16.238.7
+
+  analyzer:
+    image: anchore/anchore-engine:v0.9.4
+    depends_on:
+      - db
+      - catalog
+    expose:
+      - 8228
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 100m
+    environment:
+      - ANCHORE_ENDPOINT_HOSTNAME=analyzer
+      - ANCHORE_ADMIN_PASSWORD=foobar
+      - ANCHORE_DB_HOST=db
+      - ANCHORE_DB_PASSWORD=mysecretpassword
     volumes:
-      - 'nexus-data:/nexus-data'
-volumes:
-  nexus-data:
-  volume1:
+      - /analysis_scratch
+    command: ["anchore-manager", "service", "start", "analyzer"]
+    networks:
+      my_net:
+        ipv4_address: 172.16.238.8
+
+  db:
+    image: "postgres:9"
+    volumes:
+      - anchore-db-volume:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=mysecretpassword
+    expose:
+      - 5432
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 100m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+    networks:
+      my_net:
+        ipv4_address: 172.16.238.9
+
+networks:
+  my_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.238.0/24
+          gateway: 172.16.238.1
