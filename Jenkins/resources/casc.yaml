@@ -27,6 +27,12 @@ credentials:
             username: "admin"
             password: "admin"
             description: "Nexus credentials for connecting to Nexus docker registry"
+        - usernamePassword:
+            scope: GLOBAL
+            id: "anchore"
+            username: "admin"
+            password: "foobar"
+            description: "Anchore Engine credentials"
 unclassified:
   location:
     url: http://127.0.0.1:8080/
@@ -84,8 +90,8 @@ jobs:
                   }
                   stage ('Analyzing Docker image with Anchore') {
                     steps {
-                      writeFile file: 'anchore_images', text: "http://localhost:8081/repository/docker-private/${env.DOCKER_IMAGE}:v${env.BUILD_ID}"
-                      anchore name: 'anchore_images'
+                      writeFile file: 'anchore_images', text: "172.16.238.3:8083/${env.DOCKER_IMAGE}:v${env.BUILD_ID}"
+                      anchore name: 'anchore_images', engineCredentialsId: 'anchore'
                     }
                   }
                 }

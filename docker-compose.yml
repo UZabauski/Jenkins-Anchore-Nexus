@@ -23,16 +23,19 @@ services:
         ipv4_address: 172.16.238.2
 
   nexus:
-    #build: Nexus
-    image: sonatype/nexus3:3.30.1
+    build: Nexus2
+    #image: sonatype/nexus3:3.30.1
+    #image: bradbeck/nexus-https
     container_name: nexus
     ports:
       - '8081:8081'
       - '8082:8082'
+      - '8083:8083'
+      - '8443:8443'
     restart: always
     networks:
-        my_net:
-          ipv4_address: 172.16.238.3
+      my_net:
+        ipv4_address: 172.16.238.3
 
   # The primary API endpoint service
   api:
